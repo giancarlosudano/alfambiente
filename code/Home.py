@@ -1,50 +1,15 @@
-from turtle import title
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from langchain_openai import AzureChatOpenAI
 import streamlit as st
-import os
-import traceback
+import costants as c
 from dotenv import load_dotenv
-
-from langchain_core.output_parsers import StrOutputParser
-from langchain.prompts import PromptTemplate
-from langchain_community.callbacks import StreamlitCallbackHandler
-
-def search(question):
-
-	azure_endpoint: str = os.getenv("AZURE_OPENAI_BASE") or ""
-	api_key: str = os.getenv("AZURE_OPENAI_KEY") or ""
-	api_version: str = os.getenv("AZURE_OPENAI_API_VERSION") or ""
-	azure_openai_deployment: str = os.getenv("AZURE_OPENAI_MODEL_NAME") or ""
-
-	cont = st.container()
-	st_callback = StreamlitCallbackHandler(cont)
-	 
-	llm = AzureChatOpenAI(
-		azure_deployment=azure_openai_deployment,
-		temperature=0.7, streaming=True,
-		azure_endpoint=azure_endpoint,
-		api_key=api_key, api_version=api_version, callbacks=[st_callback])
-
-	prompt_template = """Sei uno specialista sulle normative italiane in merito ad argomenti HSE.
-
-Domanda: {question}
-
-- Mostra il tuo ragionamento
-- Cita ove possibile le leggi e gli articoli a cui ti riferisci per la risposta
-- cita ove possibile articoli del codice civile, penale, del lavoro, italiano a completamento della risposta
- 
-Risposta:
-"""
-
-	prompt = PromptTemplate(template= prompt_template, input_variables=["context", "question"])
-
-	# Chain
-	rag_chain = prompt | llm | StrOutputParser()
-
-	# Run
-	generation = rag_chain.invoke({"question": question})
-  
-	return
+from rfp_brain import vanilla_retrieval, parentdoc_retrieval, summary_fixed_retrieval
+import helpers.formatting_helper as formatting_helper
+import traceback
 
 try:
 	load_dotenv()
@@ -53,7 +18,10 @@ try:
 	st.sidebar.image(os.path.join('images','alfambiente.png'), use_column_width=True)	
 	question_default = ""
 	question = st.text_area("Domanda", key="question", value=question_default)
-	st.button("Risposta...", on_click=search, args=[question])
+	if st.button("Risposta..."):
+		answer, chunks = vanilla_retrieval(question, c.INDEX_SOURCE)
+		st.success(answer)
+		st.info(formatting_helper.format_docs(chunks))
 	
 except Exception as e:
 	st.error(traceback.format_exc())
